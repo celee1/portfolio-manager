@@ -15,8 +15,15 @@ import string
 import json
 import sys
 import key
+from requests.exceptions import ConnectionError
 
 matplotlib.use('Qt5Agg')
+
+# nastavit kontrolu crypta s ispravljanjem vrijednosti na 0 (1)
+# popravit dizajn grafa, dodat opcije za prikaz određenih datum (sve, 1 god, 6 mj, 1 mj) (1)
+# Graf kao klasa s opcijama ugrađenim? Onda i u prikazu pojedinih vrijednosti se može koristit (1)
+# Završit top x cryptos (1)
+# Razmotrit dodatak etfs i dionice? (2)
 
 
 class PortfolioManager(QMainWindow):
@@ -24,7 +31,7 @@ class PortfolioManager(QMainWindow):
         super().__init__()
 
         self.db = sqlite3.connect(
-            r'App_projects\portfolio_updater\portfolio.db')
+            r"C:\Users\celes\OneDrive\Documents\Python_3.10\Projects\App_projects\portfolio_updater\portfolio.db")
         self.cursor = self.db.cursor()
 
         self.setGeometry(0, 0, 900, 900)
@@ -100,11 +107,19 @@ class PortfolioManager(QMainWindow):
         graph_action.triggered.connect(self.open_graphs)
         graphs_menu.addAction(graph_action)
 
+        top_x_menu = self.menu_bar.addMenu('&Top X cryptos')
+
+        top_x_Action = QAction('&Top x cryptos', self)
+        top_x_Action.setShortcut('Ctrl+X')
+        top_x_Action.setStatusTip('Show a X number of top rated cryptos')
+        top_x_Action.triggered.connect(self.show_x_cryptos)
+        top_x_menu.addAction(top_x_Action)
+
         exit_menu = self.menu_bar.addMenu('&Exit')
 
         exitAction = QAction('&Exit', self)
         exitAction.setShortcut('Ctrl+Q')
-        exitAction.setStatusTip('Exit application')
+        exitAction.setStatusTip('Close the app')
         exitAction.triggered.connect(self.close)
         exit_menu.addAction(exitAction)
 
@@ -121,15 +136,11 @@ class PortfolioManager(QMainWindow):
 
         self.asset_classes_button = PushButton(
             'Crypto information', action=self.open_assets)
-        self.grid.addWidget(self.asset_classes_button, 1, 1)
+        self.grid.addWidget(self.asset_classes_button, 1, 2)
 
         self.check_crypto_button = PushButton(
             'Check crypto', action=self.check_crypto)
         self.grid.addWidget(self.check_crypto_button, 1, 0)
-
-        self.edit_tables_button = PushButton(
-            'Edit tables', action=self.edit_tables)
-        self.grid.addWidget(self.edit_tables_button, 1, 2)
 
     def get_column_names(self, table_name):
         columns = w.cursor.execute(
@@ -207,10 +218,11 @@ class PortfolioManager(QMainWindow):
 
     def check_crypto(self):
         self.checker = CoinChecker(w.cursor, w.db)
-        self.checker.update_staking()
-        self.checker.update_crypto()
-        self.checker.update_total_value_crypto()
-        self.checker.update_perc_profit_loss_column()
+        if self.checker.checked:
+            self.checker.update_staking()
+            self.checker.update_crypto()
+            self.checker.update_total_value_crypto()
+            self.checker.update_perc_profit_loss_column()
 
     def open_assets(self):
         self.assets = AssetWindow()
@@ -219,10 +231,6 @@ class PortfolioManager(QMainWindow):
     def open_staking(self):
         self.staking = StakingWindow()
         self.staking.show()
-
-    def edit_tables(self):
-        self.edit = EditWindow()
-        self.edit.show()
 
     def make_transaction(self):
         self.transactions = TransactionWindow()
@@ -252,6 +260,14 @@ class PortfolioManager(QMainWindow):
         self.graph_window = GraphWindow()
         self.graph_window.show()
 
+    def show_x_cryptos(self):
+        self.new_window = ShowCryptos('general')
+        self.new_window.show()
+
+    def show_x_cryptos_perc(self):
+        self.new_window = ShowCryptos('percentage')
+        self.new_window.show()
+
 
 class CoinChecker:
     def __init__(self, cursor, database):
@@ -274,36 +290,41 @@ class CoinChecker:
         try:
             response = requests.get(url, params=parameters, headers=headers)
             data = json.loads(response.text)['data']
-        except KeyError:
+
+            coin_info = {}
+            not_checked = []
+
+            coins = cursor.execute(
+                'SELECT name, amount FROM crypto WHERE name != "crypto20" ORDER BY ticker;').fetchall()
+
+            for coin in coins:
+                coin_info[coin[0]] = float(coin[1])
+                not_checked.append(coin[0])
+
+            w.cursor.execute('DELETE FROM not_checked')
+
+            for item in data:
+                if item['name'].lower() in coin_info.keys():
+                    name = item['name'].lower()
+                    price = round(float(item['quote']['EUR']['price']), 4)
+                    amount = round(coin_info[name] * price, 2)
+                    cursor.execute(
+                        f'UPDATE crypto SET current_value = "{amount}", current_price = "{price}" WHERE name = "{name}";')
+                    not_checked.remove(name)
+
+            [w.cursor.execute(
+                f'INSERT INTO not_checked VALUES ("{coin}");') for coin in not_checked]
+
+            database.commit()
+
+            self.checked = True
+
+        except (KeyError, ConnectionError):
             msg = QMessageBox(QMessageBox.Warning, 'Error',
                               'Data could not be fetched')
             msg.exec_()
 
-        coin_info = {}
-        not_checked = []
-
-        coins = cursor.execute(
-            'SELECT name, amount FROM crypto WHERE name != "crypto20" ORDER BY ticker;').fetchall()
-
-        for coin in coins:
-            coin_info[coin[0]] = float(coin[1])
-            not_checked.append(coin[0])
-
-        w.cursor.execute('DELETE FROM not_checked')
-
-        for item in data:
-            if item['name'].lower() in coin_info.keys():
-                name = item['name'].lower()
-                price = round(float(item['quote']['EUR']['price']), 4)
-                amount = round(coin_info[name] * price, 2)
-                cursor.execute(
-                    f'UPDATE crypto SET current_value = "{amount}", current_price = "{price}" WHERE name = "{name}";')
-                not_checked.remove(name)
-
-        [w.cursor.execute(
-            f'INSERT INTO not_checked VALUES ("{coin}");') for coin in not_checked]
-
-        database.commit()
+            self.checked = False
 
     def update_staking(self):
 
@@ -312,16 +333,22 @@ class CoinChecker:
 
         def sort_cryptos(item):
             return item[0]
+
         staking_info = cursor.execute(
             'SELECT ticker, amount, apy FROM staking').fetchall()
         staking_info.sort(key=sort_cryptos)
 
         crypto_info = [item for item in cursor.execute(
-            'SELECT ticker, amount, current_value FROM crypto').fetchall() if item[0] in [item[0] for item in staking_info]]
+            'SELECT ticker, amount, current_price FROM crypto').fetchall() if item[0] in [item[0] for item in staking_info]]
         crypto_info.sort(key=sort_cryptos)
 
-        updated_values = [float(crypto[2]) * (float(staking[2]) / 100) / 12 *
-                          (float(staking[1]) / float(crypto[1])) if float(staking[1]) != 0 else 0 for crypto, staking in zip(crypto_info, staking_info)]
+        updated_values = [float(crypto[2]) * float(staking[1]) / 100 * float(staking[2]) / 12 if float(
+            staking[1]) != 0 else 0 for crypto, staking in zip(crypto_info, staking_info)]
+
+        # formula = trenutna vrijednost * kolicina / 100 * apy / 12 -- izracun yielda za staking
+
+        # updated_values = [float(crypto[2]) * (float(staking[2]) / 100) / 12 *
+        #                  (float(staking[1]) / float(crypto[1])) if float(staking[1]) != 0 else 0 for crypto, staking in zip(crypto_info, staking_info)]
 
         updated_values = [[ticker[0], round(value, 2)]
                           for value, ticker in zip(updated_values, crypto_info)]
@@ -343,6 +370,7 @@ class CoinChecker:
         if '0' in amounts or 0 in amounts:
             for coin in coins:
                 if float(coin[1]) == 0:
+                    print(coin)
                     cursor.execute(
                         f'DELETE FROM transactions WHERE ticker = "{coin[0]}";')
                     loss = cursor.execute(
@@ -378,8 +406,12 @@ class CoinChecker:
         current_value, amount_invested = cursor.execute(
             'SELECT ROUND(SUM(current_value), 4), ROUND(SUM(amount_invested), 4) FROM crypto').fetchall()[0]
 
-        perc_profit = round(
-            (current_value - amount_invested) / amount_invested * 100, 4)
+        try:
+            perc_profit = round(
+                (current_value - amount_invested) / amount_invested * 100, 4)
+
+        except ZeroDivisionError:
+            perc_profit = 0
 
         cursor.execute(
             f'INSERT INTO total_value_crypto VALUES ("{current_value}", "{date}", "{perc_profit}");')
@@ -390,15 +422,19 @@ class CoinChecker:
             'SELECT dca_price, current_price, ticker FROM crypto').fetchall()
 
         for item in price:
-            ratio = float(item[1]) / float(item[0]) * 100
-            if ratio > 1:
-                ratio = (ratio - 100)
-            elif ratio < 1:
-                ratio = -(100 - ratio)
-            else:
-                ratio = 100
-            self.cursor.execute(
-                f'UPDATE crypto SET profit_loss = "{round(ratio, 2)}" WHERE ticker = "{item[2]}";')
+            try:
+                ratio = float(item[1]) / float(item[0]) * 100
+                if ratio > 1:
+                    ratio = (ratio - 100)
+                elif ratio < 1:
+                    ratio = -(100 - ratio)
+                else:
+                    ratio = 100
+                self.cursor.execute(
+                    f'UPDATE crypto SET profit_loss = "{round(ratio, 2)}" WHERE ticker = "{item[2]}";')
+
+            except ZeroDivisionError:
+                pass
 
         self.database.commit()
 
@@ -707,35 +743,6 @@ class StakingUpdate(QWidget):
         CoinChecker(w.cursor, w.db).update_staking()
 
 
-class EditWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-
-        self.setGeometry(0, 0, 900, 900)
-        self.setWindowTitle('Table editing')
-        self.setStyleSheet('background: #000000')
-
-        self.grid = QGridLayout(self)
-
-        self.label1 = CentralLabel('Table editing')
-        self.grid.addWidget(self.label1, 0, 0, 1, 3)
-
-        self.query_edit = LineEdit(300)
-        self.grid.addWidget(self.query_edit, 1, 1)
-
-        self.query_button = PushButton('run query', 300, self.run_query)
-        self.grid.addWidget(self.query_button, 1, 2)
-
-        self.close_button = PushButton('close window', 300, self.close)
-        self.grid.addWidget(self.close_button, 2, 2)
-
-    def run_query(self):
-        w.cursor.execute(self.query_edit.text())
-        w.db.commit()
-
-        self.query_edit.setText('')
-
-
 class TransactionWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -999,14 +1006,26 @@ class GraphWindow(QWidget):
         self.grid_2 = QGridLayout(self.frame_2)
         self.grid.addWidget(self.frame_2, 1, 0)
 
-        # dodat comparison symbol
         self.label_1 = Label('Enter a ticker', 300)
         self.grid_1.addWidget(self.label_1, 0, 0)
         self.edit_1 = LineEdit(300)
+        self.edit_1.setText('BTC')
         self.grid_1.addWidget(self.edit_1, 0, 1)
 
-        button_1 = PushButton('Make graph', 300, self.make_graph)
-        self.grid_2.addWidget(button_1, 0, 0)
+        self.label_2 = Label('Enter a currency', 300)
+        self.grid_1.addWidget(self.label_2, 1, 0)
+        self.edit_2 = LineEdit(300)
+        self.edit_2.setText('EUR')
+        self.grid_1.addWidget(self.edit_2, 1, 1)
+
+        self.button_1 = PushButton('Make graph', 300, self.make_graph)
+        self.grid_2.addWidget(self.button_1, 0, 0)
+
+        self.button_2 = PushButton('1 month', 300, self.make_graph)
+        self.button_3 = PushButton('6 months', 300, self.make_graph)
+        self.button_4 = PushButton('1 year', 300, self.make_graph)
+
+        self.buttons_shown = False
 
     def daily_price_historical(self, symbol, comparison_symbol, all_data=True, limit=1, aggregate=1, exchange=''):
         url = 'https://min-api.cryptocompare.com/data/histoday?fsym={}&tsym={}&limit={}&aggregate={}'\
@@ -1022,22 +1041,132 @@ class GraphWindow(QWidget):
         return df
 
     def make_graph(self):
+        if self.buttons_shown != True:
+            self.grid_1.addWidget(self.button_2, 3, 0)
+            self.grid_1.addWidget(self.button_3, 3, 1)
+            self.grid_1.addWidget(self.button_4, 3, 2)
         try:
-            df = self.daily_price_historical(self.edit_1.text().upper(), 'EUR')
+            df = self.daily_price_historical(
+                self.edit_1.text().upper(), self.edit_2.text().upper())
+
+            text = self.sender().text()
+            if text != 'Make graph':
+                date = datetime.now().strftime("%Y-%m-%d")
+                year = int(date[:4])
+                month = int(date[5:7])
+                day = int(date[8:])
+
+                if text == '1 year':
+                    year -= 1
+
+                else:
+                    text = int(text.split(' ')[0])
+
+                    if text < month:
+                        month -= text
+                    else:
+                        year -= 1
+                        month += text
+                        month = month % 12
+
+                if month < 10:
+                    month = '0' + str(month)
+
+                date = str(year) + '-' + month + '-' + str(day)
+
+                df = df[df["timestamp"] > date]
+
             self.canvas = MplCanvas(self)
             self.canvas.axes.plot(df.timestamp, df.close)
-            self.grid_1.addWidget(self.canvas, 1, 0, 1, 2)
+            self.grid_1.addWidget(self.canvas, 2, 0, 1, 3)
             self.canvas.show()
 
             self.canvas.axes.set_title(
-                f'Historical price data for {self.edit_1.text().upper()} in EUR')
-        except AttributeError:
-            msg = QMessageBox(QMessageBox.Warning, 'Symbol unknown',
-                              'Crypto with this symbol could not be found')
+                f'Historical price data for {self.edit_1.text().upper()} in {self.edit_2.text().upper()}')
+        except ZeroDivisionError:
+            msg = QMessageBox(QMessageBox.Warning, 'Data not found',
+                              'Crypto with this symbol could not be found or not supported in this currency')
             msg.exec_()
 
-        self.edit_1.setText('')
-        self.edit_1.setFocus()
+            self.edit_1.setText('')
+            self.edit_1.setFocus()
+
+
+class ShowCryptos(QWidget):
+    def __init__(self, mode):
+        super().__init__()
+
+        self.mode = mode
+
+        self.setGeometry(0, 0, 900, 900)
+        self.setWindowTitle('Top X Window')
+        self.setStyleSheet('background: #000000')
+
+        self.grid = QGridLayout(self)
+
+        self.grid.addWidget(Label('Num of cryptos: '), 0, 0)
+        self.edit_1 = LineEdit(300)
+        self.grid.addWidget(self.edit_1, 0, 1)
+        self.grid.addWidget(PushButton('Look up', 300, self.get_data), 0, 2)
+
+    def get_data(self):
+        self.cursor = w.cursor
+        self.database = w.db
+        limit = self.edit_1.text()
+
+        try:
+            if float(limit) < 1:
+                msg = QMessageBox(QMessageBox.Warning, 'Invalid limit',
+                                  'Limit must be greater than or equal to one')
+                msg.exec_()
+                self.edit_1.setText('')
+                return
+        except ValueError:
+            msg = QMessageBox(QMessageBox.Warning, 'Invalid input',
+                              'Please enter a numerical input')
+            msg.exec()
+            return
+
+        api_key = key.api_key
+        url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
+        parameters = {
+            'start': '1',
+            'limit': limit,
+            'convert': 'EUR'
+        }
+        headers = {
+            'Accepts': 'application/json',
+            'X-CMC_PRO_API_KEY': api_key,
+        }
+
+        try:
+            response = requests.get(url, params=parameters, headers=headers)
+            data = json.loads(response.text)['data']
+        except KeyError:
+            msg = QMessageBox(QMessageBox.Warning, 'Error',
+                              'Data could not be fetched')
+            msg.exec_()
+
+        info = []
+
+        for item in data:
+            if self.mode == 'general':
+                items = [item['id'], item['name'], item['symbol'], item['num_market_pairs'], item['max_supply'], item['quote']
+                         ['EUR']['price'], item['quote']['EUR']['market_cap'], item['quote']['EUR']['market_cap_dominance']]
+                info.append(items)
+            else:
+                id = item['id']
+                name = item['name']
+                symbol = item['symbol']
+                item = item['quote']['EUR']
+                items = [item['percent_change_1h'], item['percent_change_24h'], item['percent_change_7d'],
+                         item['percent_change_30d'], item['percent_change_60d'], item['percent_change_90d']]
+                items.insert(0, id)
+                items.insert(1, name)
+                items.insert(2, symbol)
+                info.append(items)
+
+        print(info)
 
 
 class LineEdit(QLineEdit):
