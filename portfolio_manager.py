@@ -19,8 +19,8 @@ from requests.exceptions import ConnectionError
 
 matplotlib.use('Qt5Agg')
 
-# nastavit kontrolu crypta s ispravljanjem vrijednosti na 0 (1)
-# popravit dizajn grafa, dodat opcije za prikaz određenih datum (sve, 1 god, 6 mj, 1 mj) (1)
+# linija 488, popravit asset window
+
 # Graf kao klasa s opcijama ugrađenim? Onda i u prikazu pojedinih vrijednosti se može koristit (1)
 # Završit top x cryptos (1)
 # Razmotrit dodatak etfs i dionice? (2)
@@ -347,9 +347,6 @@ class CoinChecker:
 
         # formula = trenutna vrijednost * kolicina / 100 * apy / 12 -- izracun yielda za staking
 
-        # updated_values = [float(crypto[2]) * (float(staking[2]) / 100) / 12 *
-        #                  (float(staking[1]) / float(crypto[1])) if float(staking[1]) != 0 else 0 for crypto, staking in zip(crypto_info, staking_info)]
-
         updated_values = [[ticker[0], round(value, 2)]
                           for value, ticker in zip(updated_values, crypto_info)]
 
@@ -484,113 +481,50 @@ class AssetWindow(QWidget):
 
         self.grid = QGridLayout(self)
 
-        self.label_1 = CentralLabel('Asset class tables')
-        self.grid.addWidget(self.label_1, 0, 0, 1, 2)
+        self.frame_1 = QFrame(self)
+        self.frame_2 = QFrame(self)
 
-        self.label2 = Label('Table name', 500)
-        self.grid.addWidget(self.label2, 2, 0)
+        self.grid.addWidget(self.frame_1, 0, 0)
+        self.grid.addWidget(self.frame_2, 1, 0)
 
-        self.label3 = Label('Asset names (column name)', 500)
-        self.grid.addWidget(self.label3, 3, 0)
+        self.grid_1 = QGridLayout(self.frame_1)
+        self.grid_2 = QGridLayout(self.frame_2)
 
-        self.label4 = Label('Amount (column name)', 500)
-        self.grid.addWidget(self.label4, 4, 0)
-
-        self.table_edit = LineEdit(500)
-        self.table_edit.setFocus()
-        self.grid.addWidget(self.table_edit, 2, 1)
-
-        self.asset_edit = LineEdit(500)
-        self.grid.addWidget(self.asset_edit, 3, 1)
-
-        self.amount_edit = LineEdit(500)
-        self.grid.addWidget(self.amount_edit, 4, 1)
+        self.label_1 = CentralLabel('Assets')
+        self.grid_1.addWidget(self.label_1, 0, 0, 1, 2)
 
         self.table_button = PushButton('Show table', 500, self.make_table)
-        self.grid.addWidget(self.table_button, 5, 0)
+        self.grid_2.addWidget(self.table_button, 5, 0)
 
         self.graph_button = PushButton('Show graph', 500, self.make_graph)
-        self.grid.addWidget(self.graph_button, 5, 1)
+        self.grid_2.addWidget(self.graph_button, 5, 1)
 
         self.close_button = PushButton('close window', 500, self.close)
-        self.grid.addWidget(self.close_button, 6, 1)
+        self.grid_2.addWidget(self.close_button, 6, 1)
+
+        self.make_graph()
+        self.make_table()
 
     def make_table(self):
-        table_name = self.table_edit.text()
-        try:
-            if table_name != '':
-                table = w.show_table(self.table_edit.text())
-            else:
-                table = w.show_table(table_name='crypto')
-            self.grid.addWidget(table, 1, 0)
-            table.setMaximumWidth(950)
-            table.show()
-
-        except (IndexError, OperationalError):
-            msg = QMessageBox(QMessageBox.Warning,
-                              'Wrong input', 'Table name incorrect')
-            msg.exec_()
-
-            self.table_edit.setText('')
+        table = w.show_table(table_name='crypto')
+        self.grid_1.addWidget(table, 1, 1)
+        table.setMaximumWidth(1000)
+        table.setMaximumHeight(500)
+        table.show()
 
     def make_graph(self):
-        table_name = self.table_edit.text().strip()
-        if table_name == '':
-            table_name = 'total_value_crypto'
-        amount = self.amount_edit.text().strip()
-        asset = self.asset_edit.text().strip()
 
-        if table_name != 'total_value_crypto':
-            if table_name != '' and amount != '' and asset != '':
-                try:
-                    graph = w.show_graph(table_name, amount, asset)
-                    if graph:
-                        self.grid.addWidget(graph[0], 1, 1)
-                        graph[0].show_overview(
-                            graph[1], graph[2], graph[3], table_name)
-                    else:
-                        msg = QMessageBox(QMessageBox.Warning, 'Incorrect amount selection',
-                                          'Please select a numeric column as amount')
-                        msg.exec_()
+        self.canvas = MplCanvas(self)
 
-                        self.table_edit.setText('')
-                        self.amount_edit.setText('')
-                        self.asset_edit.setText('')
+        info = [item for item in w.cursor.execute(
+            f'SELECT value, date FROM total_value_crypto').fetchall()]
+        value = [float(item[0]) for item in info]
+        date = pd.to_datetime([item[1] for item in info])
 
-                except OperationalError:
-                    msg = QMessageBox(QMessageBox.Warning,
-                                      'Table not found', 'Table does not exist')
-                    msg.exec_()
-
-                    self.table_edit.setText('')
-                    self.amount_edit.setText('')
-                    self.asset_edit.setText('')
-            elif table_name == '' and amount == '' and asset == '':
-                graph = w.show_graph('crypto', 'current_value', 'ticker')
-                w.assets.grid.addWidget(graph[0], 1, 1)
-                graph[0].show_overview(graph[1], graph[2], graph[3], 'crypto')
-            else:
-                msg = QMessageBox(QMessageBox.Warning, 'Incomplete input',
-                                  'Please fill out all the entries')
-                msg.exec_()
-        else:
-            self.canvas = MplCanvas(self)
-
-            try:
-                if amount == '' and asset == '':
-                    info = [item for item in w.cursor.execute(
-                        f'SELECT value, date FROM total_value_crypto').fetchall()]
-                else:
-                    info = [item for item in w.cursor.execute(
-                        f'SELECT {amount}, {asset} FROM total_value_crypto').fetchall()]
-            except OperationalError:
-                msg = QMessageBox(QMessageBox.Warning, 'Asset and amount cannot be null',
-                                  'Please fill out the asset and the amount fields')
-            value = [float(item[0]) for item in info]
-            date = pd.to_datetime([item[1] for item in info])
-            self.canvas.axes.plot(date, value)
-            self.grid.addWidget(self.canvas, 1, 1)
-            self.canvas.show()
+        self.canvas.axes.plot(date, value)
+        self.canvas.setMaximumHeight(500)
+        self.grid_1.addWidget(self.canvas, 1, 0)
+        self.canvas.show()
 
 
 class StakingWindow(QWidget):
@@ -1034,27 +968,35 @@ class GraphWindow(QWidget):
             url += '&e={}'.format(exchange)
         if all_data:
             url += '&allData=true'
-        page = requests.get(url)
-        data = page.json()['Data']
-        df = pd.DataFrame(data)
-        df['timestamp'] = [datetime.fromtimestamp(d) for d in df.time]
-        return df
+
+        try:
+            page = requests.get(url)
+            data = page.json()['Data']
+            df = pd.DataFrame(data)
+            df['timestamp'] = [datetime.fromtimestamp(d) for d in df.time]
+            return df
+
+        except ConnectionError:
+            msg = QMessageBox(QMessageBox.Warning, 'Data not found',
+                              'Error with internet connection')
+            msg.exec_()
+
+            return False
 
     def make_graph(self):
-        if self.buttons_shown != True:
-            self.grid_1.addWidget(self.button_2, 3, 0)
-            self.grid_1.addWidget(self.button_3, 3, 1)
-            self.grid_1.addWidget(self.button_4, 3, 2)
         try:
             df = self.daily_price_historical(
                 self.edit_1.text().upper(), self.edit_2.text().upper())
+
+            if type(df) != pd.DataFrame:
+                return
 
             text = self.sender().text()
             if text != 'Make graph':
                 date = datetime.now().strftime("%Y-%m-%d")
                 year = int(date[:4])
                 month = int(date[5:7])
-                day = int(date[8:])
+                day = date[8:]
 
                 if text == '1 year':
                     year -= 1
@@ -1066,13 +1008,12 @@ class GraphWindow(QWidget):
                         month -= text
                     else:
                         year -= 1
-                        month += text
-                        month = month % 12
+                        month = (month + text) % 12
 
                 if month < 10:
                     month = '0' + str(month)
 
-                date = str(year) + '-' + month + '-' + str(day)
+                date = str(year) + '-' + month + '-' + day
 
                 df = df[df["timestamp"] > date]
 
@@ -1083,7 +1024,13 @@ class GraphWindow(QWidget):
 
             self.canvas.axes.set_title(
                 f'Historical price data for {self.edit_1.text().upper()} in {self.edit_2.text().upper()}')
-        except ZeroDivisionError:
+
+            if self.buttons_shown != True:
+                self.grid_1.addWidget(self.button_2, 3, 0)
+                self.grid_1.addWidget(self.button_3, 3, 1)
+                self.grid_1.addWidget(self.button_4, 3, 2)
+
+        except AttributeError:
             msg = QMessageBox(QMessageBox.Warning, 'Data not found',
                               'Crypto with this symbol could not be found or not supported in this currency')
             msg.exec_()
