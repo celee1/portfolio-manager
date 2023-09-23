@@ -1,5 +1,7 @@
-from PyQt5.QtWidgets import QApplication, QGridLayout, QAction, QLabel, QFrame, QMainWindow, QPushButton, QWidget, QTableWidget, QTableWidgetItem, QMessageBox, QLineEdit
+import typing
+from PyQt5.QtWidgets import QApplication, QGridLayout, QAction, QLabel, QFrame, QMainWindow, QPushButton, QWidget, QTableWidget, QTableWidgetItem, QMessageBox, QLineEdit, QVBoxLayout, QScrollArea
 from PyQt5.QtGui import QBrush, QColor, QCursor
+from PyQt5.QtCore import Qt, QSize
 from PyQt5 import QtCore
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
@@ -18,8 +20,6 @@ import key
 from requests.exceptions import ConnectionError
 
 matplotlib.use('Qt5Agg')
-
-# linija 488, popravit asset window
 
 # Graf kao klasa s opcijama ugrađenim? Onda i u prikazu pojedinih vrijednosti se može koristit (1)
 # Završit top x cryptos (1)
@@ -310,6 +310,8 @@ class CoinChecker:
                     amount = round(coin_info[name] * price, 2)
                     cursor.execute(
                         f'UPDATE crypto SET current_value = "{amount}", current_price = "{price}" WHERE name = "{name}";')
+                    cursor.execute(
+                        f'UPDATE staking SET current_price = "{price}" WHERE name = "{name}";')
                     not_checked.remove(name)
 
             [w.cursor.execute(
@@ -331,28 +333,17 @@ class CoinChecker:
         cursor = self.cursor
         database = self.database
 
-        def sort_cryptos(item):
-            return item[0]
-
         staking_info = cursor.execute(
-            'SELECT ticker, amount, apy FROM staking').fetchall()
-        staking_info.sort(key=sort_cryptos)
+            'SELECT ticker, amount, apy, current_price FROM staking').fetchall()
 
-        crypto_info = [item for item in cursor.execute(
-            'SELECT ticker, amount, current_price FROM crypto').fetchall() if item[0] in [item[0] for item in staking_info]]
-        crypto_info.sort(key=sort_cryptos)
+        updated_values = [
+            [round(float(item[3]) * float(item[1]) / 100 * float(item[2]) / 12, 3), item[0]] for item in staking_info]
 
-        updated_values = [float(crypto[2]) * float(staking[1]) / 100 * float(staking[2]) / 12 if float(
-            staking[1]) != 0 else 0 for crypto, staking in zip(crypto_info, staking_info)]
-
-        # formula = trenutna vrijednost * kolicina / 100 * apy / 12 -- izracun yielda za staking
-
-        updated_values = [[ticker[0], round(value, 2)]
-                          for value, ticker in zip(updated_values, crypto_info)]
+        # formula = current value * amount / 100 * apy / 12 -- staking yield calculation
 
         for value in updated_values:
             cursor.execute(
-                f'UPDATE staking set yield = {value[1]} WHERE ticker = "{value[0]}"')
+                f'UPDATE staking set yield = {value[0]} WHERE ticker = "{value[1]}"')
         database.commit()
 
     def update_crypto(self):
@@ -493,21 +484,15 @@ class AssetWindow(QWidget):
         self.label_1 = CentralLabel('Assets')
         self.grid_1.addWidget(self.label_1, 0, 0, 1, 2)
 
-        self.table_button = PushButton('Show table', 500, self.make_table)
-        self.grid_2.addWidget(self.table_button, 5, 0)
-
-        self.graph_button = PushButton('Show graph', 500, self.make_graph)
-        self.grid_2.addWidget(self.graph_button, 5, 1)
-
         self.close_button = PushButton('close window', 500, self.close)
-        self.grid_2.addWidget(self.close_button, 6, 1)
+        self.grid_2.addWidget(self.close_button, 5, 1)
 
-        self.make_graph()
         self.make_table()
+        self.make_graph()
 
     def make_table(self):
         table = w.show_table(table_name='crypto')
-        self.grid_1.addWidget(table, 1, 1)
+        self.grid_1.addWidget(table, 1, 1, 2, 1)
         table.setMaximumWidth(1000)
         table.setMaximumHeight(500)
         table.show()
@@ -525,6 +510,62 @@ class AssetWindow(QWidget):
         self.canvas.setMaximumHeight(500)
         self.grid_1.addWidget(self.canvas, 1, 0)
         self.canvas.show()
+
+        graph = w.show_graph(table_name='crypto',
+                             amount='current_value', asset='ticker')
+        graph[0].setMaximumWidth(600)
+        self.grid_1.addWidget(graph[0], 2, 0)
+        total_staking = sum([float(item[0]) for item in w.cursor.execute(
+            'SELECT current_value FROM crypto').fetchall()])
+        graph[0].show_overview(
+            graph[1], graph[2], f'{graph[3]}: {round(total_staking, 2)} € total value', 'staking')
+
+
+class CryptoInfoWindow(QMainWindow):
+
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+        self.setGeometry(0, 0, 1000, 1000)
+
+        self.setWindowTitle('Extra crypto information')
+
+    def initUI(self):
+        self.widget = QWidget()
+        self.grid = QGridLayout(self.widget)
+        self.setStyleSheet('background: #000000')
+
+        self.scroll = QScrollArea()
+        self.setCentralWidget(self.scroll)
+
+        self.scroll.setWidget(self.widget)
+
+        self.button = PushButton('Exit', 100, self.close)
+        self.grid.addWidget(self.button, 0, 1)
+
+        self.grid.addWidget(Label('Crypto distribution'), 1, 0)
+
+        self.make_graph()
+
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll.setWidgetResizable(True)
+
+        # self.setGeometry(600, 100, 600, 500)
+        self.setWindowTitle('Scroll Area Demonstration')
+        self.show()
+
+        return
+
+    def make_graph(self):
+        graph = w.show_graph(table_name='crypto',
+                             amount='current_value', asset='ticker')
+        self.grid.addWidget(graph[0], 2, 0)
+        total_staking = sum([float(item[0]) for item in w.cursor.execute(
+            'SELECT current_value FROM crypto').fetchall()])
+        graph[0].show_overview(
+            graph[1], graph[2], f'{graph[3]}: {round(total_staking, 2)} € total value', 'staking')
 
 
 class StakingWindow(QWidget):
