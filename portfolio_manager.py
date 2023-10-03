@@ -21,7 +21,6 @@ from requests.exceptions import ConnectionError
 
 matplotlib.use('Qt5Agg')
 
-# Graf kao klasa s opcijama ugrađenim? Onda i u prikazu pojedinih vrijednosti se može koristit (1)
 # Završit top x cryptos (1)
 # Razmotrit dodatak etfs i dionice? (2)
 
@@ -1053,6 +1052,8 @@ class GraphWindow(QWidget):
 
                 if month < 10:
                     month = '0' + str(month)
+                else:
+                    month = str(month)
 
                 date = str(year) + '-' + month + '-' + day
 
