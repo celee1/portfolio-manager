@@ -1,4 +1,3 @@
-import typing
 from PyQt5.QtWidgets import QApplication, QGridLayout, QAction, QLabel, QFrame, QMainWindow, QPushButton, QWidget, QTableWidget, QTableWidgetItem, QMessageBox, QLineEdit, QVBoxLayout, QScrollArea
 from PyQt5.QtGui import QBrush, QColor, QCursor
 from PyQt5.QtCore import Qt, QSize
@@ -9,7 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 from sqlite3 import OperationalError
 import sqlite3
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import pandas as pd
 import numpy as np
 import requests
@@ -21,8 +20,9 @@ from requests.exceptions import ConnectionError
 
 matplotlib.use('Qt5Agg')
 
-# Završit top x cryptos (1)
-# Razmotrit dodatak etfs i dionice? (2)
+# dodat error pri pisanju zareza (2)
+# dodat dca po transakciji -> pri dodavanju transakicje fetchat current price i dodat u stupac pored
+# Završit top x cryptos (3)
 
 
 class PortfolioManager(QMainWindow):
@@ -756,20 +756,33 @@ class TransactionWindow(QWidget):
         self.grid.addWidget(self.close_button, 4, 2)
 
     def insert_a_transaction(self):
-        if '' not in [self.edit_1.text(), self.edit_2.text(), self.edit_3.text(), self.edit_4.text()]:
-            w.cursor.execute(
-                f'INSERT INTO transactions VALUES ("{self.edit_1.text()}", "{self.edit_2.text()}", "{self.edit_3.text()}", "{self.edit_4.text()}");')
-            w.db.commit()
+        texts = [self.edit_1.text(), self.edit_2.text(),
+                 self.edit_3.text(), self.edit_4.text()]
 
-            self.edit_1.setText('')
-            self.edit_2.setText('')
-            self.edit_3.setText('')
-            self.edit_4.setText('')
-
-        else:
+        if '' in texts:
             msg = QMessageBox(
                 QMessageBox.Warning, 'Incomplete input', 'Please fill out all the entries')
             msg.exec_()
+            return
+
+        try:
+            float(texts[2])
+            float(texts[3])
+
+        except ValueError:
+            msg = QMessageBox(QMessageBox.Warning, 'Entry invalid',
+                              'Please use the correct number format with a decimal point')
+            msg.exec_()
+            return
+
+        w.cursor.execute(
+            f'INSERT INTO transactions VALUES ("{texts[0]}", "{texts[1]}", "{texts[2]}", "{texts[3]}");')
+        w.db.commit()
+
+        self.edit_1.setText('')
+        self.edit_2.setText('')
+        self.edit_3.setText('')
+        self.edit_4.setText('')
 
         self.edit_1.setFocus()
 
@@ -1032,32 +1045,21 @@ class GraphWindow(QWidget):
                 return
 
             text = self.sender().text()
+            now = datetime.now()
+
+            if text == '1 year':
+                time = 365
+            elif text == '6 months':
+                time = 180
+            elif text == '1 month':
+                time = 30
+            else:
+                time = 0
+
+            now = (now - timedelta(days=time)).strftime("%Y-%m-%d")
+
             if text != 'Make graph':
-                date = datetime.now().strftime("%Y-%m-%d")
-                year = int(date[:4])
-                month = int(date[5:7])
-                day = date[8:]
-
-                if text == '1 year':
-                    year -= 1
-
-                else:
-                    text = int(text.split(' ')[0])
-
-                    if text < month:
-                        month -= text
-                    else:
-                        year -= 1
-                        month = (month + text) % 12
-
-                if month < 10:
-                    month = '0' + str(month)
-                else:
-                    month = str(month)
-
-                date = str(year) + '-' + month + '-' + day
-
-                df = df[df["timestamp"] > date]
+                df = df[df["timestamp"] > now]
 
             self.canvas = MplCanvas(self)
             self.canvas.axes.plot(df.timestamp, df.close)
