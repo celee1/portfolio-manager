@@ -1,14 +1,15 @@
 from PyQt5.QtWidgets import QApplication, QGridLayout, QAction, QLabel, QFrame, QMainWindow, QPushButton, QWidget, QTableWidget, QTableWidgetItem, QMessageBox, QLineEdit, QVBoxLayout, QScrollArea
 from PyQt5.QtGui import QBrush, QColor, QCursor
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt
 from PyQt5 import QtCore
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import matplotlib
+from requests.exceptions import ConnectionError
 from sqlite3 import OperationalError
 import sqlite3
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 import requests
@@ -16,13 +17,12 @@ import string
 import json
 import sys
 import key
-from requests.exceptions import ConnectionError
+
 
 matplotlib.use('Qt5Agg')
 
-# dodat error pri pisanju zareza (2)
-# dodat dca po transakciji -> pri dodavanju transakicje fetchat current price i dodat u stupac pored
-# Završit top x cryptos (3)
+# dodat dca po transakciji -> pri dodavanju transakcije fetchat current price i dodat u stupac pored (2)
+# Završit top x cryptos (3) -> kako dodat tablicu?
 
 
 class PortfolioManager(QMainWindow):
@@ -260,11 +260,7 @@ class PortfolioManager(QMainWindow):
         self.graph_window.show()
 
     def show_x_cryptos(self):
-        self.new_window = ShowCryptos('general')
-        self.new_window.show()
-
-    def show_x_cryptos_perc(self):
-        self.new_window = ShowCryptos('percentage')
+        self.new_window = ShowCryptos()
         self.new_window.show()
 
 
@@ -1084,13 +1080,11 @@ class GraphWindow(QWidget):
 
 
 class ShowCryptos(QWidget):
-    def __init__(self, mode):
+    def __init__(self):
         super().__init__()
 
-        self.mode = mode
-
         self.setGeometry(0, 0, 900, 900)
-        self.setWindowTitle('Top X Window')
+        self.setWindowTitle('Crypto Rankings Window')
         self.setStyleSheet('background: #000000')
 
         self.grid = QGridLayout(self)
@@ -1138,26 +1132,21 @@ class ShowCryptos(QWidget):
                               'Data could not be fetched')
             msg.exec_()
 
-        info = []
+        info = {'id': [], 'name': [], 'symbol': [], 'price': [],
+                'market_cap': [], 'market_dominance': []}
 
         for item in data:
-            if self.mode == 'general':
-                items = [item['id'], item['name'], item['symbol'], item['num_market_pairs'], item['max_supply'], item['quote']
-                         ['EUR']['price'], item['quote']['EUR']['market_cap'], item['quote']['EUR']['market_cap_dominance']]
-                info.append(items)
-            else:
-                id = item['id']
-                name = item['name']
-                symbol = item['symbol']
-                item = item['quote']['EUR']
-                items = [item['percent_change_1h'], item['percent_change_24h'], item['percent_change_7d'],
-                         item['percent_change_30d'], item['percent_change_60d'], item['percent_change_90d']]
-                items.insert(0, id)
-                items.insert(1, name)
-                items.insert(2, symbol)
-                info.append(items)
+            info['id'].append(item['id'])
+            info['name'].append(item['name'])
+            info['symbol'].append(item['symbol'])
+            info['price'].append(item['quote']['EUR']['price'])
+            info['market_cap'].append(item['quote']['EUR']['market_cap'])
+            info['market_dominance'].append(
+                item['quote']['EUR']['market_cap_dominance'])
 
-        print(info)
+        self.df = pd.DataFrame(info)
+
+        w.show_table()
 
 
 class LineEdit(QLineEdit):
