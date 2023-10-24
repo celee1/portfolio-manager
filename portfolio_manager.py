@@ -752,7 +752,7 @@ class TransactionWindow(QWidget):
         self.grid.addWidget(self.close_button, 4, 2)
 
     def insert_a_transaction(self):
-        texts = [self.edit_1.text(), self.edit_2.text(),
+        texts = [self.edit_1.text().lower(), self.edit_2.text().upper(),
                  self.edit_3.text(), self.edit_4.text()]
 
         if '' in texts:
