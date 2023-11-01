@@ -21,8 +21,8 @@ import key
 
 matplotlib.use('Qt5Agg')
 
-# dodat dca po transakciji -> pri dodavanju transakcije fetchat current price i dodat u stupac pored (2)
-# Završit top x cryptos (3) -> kako dodat tablicu?
+# Završit top x cryptos -> kako dodat tablicu?
+# zasto dupli klik prije pokazivanja pie charta, obicni chart moze i ovako?
 
 
 class PortfolioManager(QMainWindow):
@@ -510,10 +510,10 @@ class AssetWindow(QWidget):
                              amount='current_value', asset='ticker')
         graph[0].setMaximumWidth(600)
         self.grid_1.addWidget(graph[0], 2, 0)
-        total_staking = sum([float(item[0]) for item in w.cursor.execute(
+        cryptos = sum([float(item[0]) for item in w.cursor.execute(
             'SELECT current_value FROM crypto').fetchall()])
         graph[0].show_overview(
-            graph[1], graph[2], f'{graph[3]}: {round(total_staking, 2)} € total value', 'staking')
+            graph[1], graph[2], f'{graph[3]}: {round(cryptos, 2)} € total value', 'cryptos')
 
 
 class CryptoInfoWindow(QMainWindow):
@@ -723,33 +723,29 @@ class TransactionWindow(QWidget):
 
         self.grid = QGridLayout(self)
 
-        self.label_1 = Label('coin')
-        self.grid.addWidget(self.label_1, 0, 0)
+        self.grid.addWidget(Label('coin'), 0, 0)
 
         self.edit_1 = LineEdit(300)
         self.grid.addWidget(self.edit_1, 0, 1)
 
-        self.label_2 = Label('ticker')
-        self.grid.addWidget(self.label_2, 1, 0)
+        self.grid.addWidget(Label('ticker'), 1, 0)
 
         self.edit_2 = LineEdit(300)
         self.grid.addWidget(self.edit_2, 1, 1)
 
-        self.label_3 = Label('amount')
-        self.grid.addWidget(self.label_3, 2, 0)
+        self.grid.addWidget(Label('amount'), 2, 0)
 
         self.edit_3 = LineEdit(300)
         self.grid.addWidget(self.edit_3, 2, 1)
 
-        self.label_4 = Label('amount_invested')
-        self.grid.addWidget(self.label_4, 3, 0)
+        self.grid.addWidget(Label('amount_invested'), 3, 0)
 
         self.edit_4 = LineEdit(300)
         self.grid.addWidget(self.edit_4, 3, 1)
 
         self.close_button = PushButton(
             'insert a transaction', 300, self.insert_a_transaction)
-        self.grid.addWidget(self.close_button, 4, 2)
+        self.grid.addWidget(self.close_button, 5, 2)
 
     def insert_a_transaction(self):
         texts = [self.edit_1.text().lower(), self.edit_2.text().upper(),
