@@ -1142,7 +1142,20 @@ class ShowCryptos(QWidget):
 
         self.df = pd.DataFrame(info)
 
-        w.show_table()
+        self.table = QTableWidget(int(limit), 6)
+
+        self.table = QTableWidget(int(limit), 6, self)
+        for i in range(int(limit)):
+            for j in range(6):
+                item = QTableWidgetItem(self.df.iloc[int(i), int(j)])
+                item.setForeground(QBrush(QColor("#1eecc9")))
+                self.table.setItem(i, j, item)
+
+            # self.table.setHorizontalHeaderLabels(columns)
+
+        self.grid.addWidget(self.table, 2, 3)
+
+        print(self.df.head(5))
 
 
 class LineEdit(QLineEdit):
