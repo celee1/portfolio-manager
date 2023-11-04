@@ -1,6 +1,5 @@
 from PyQt5.QtWidgets import QApplication, QGridLayout, QAction, QLabel, QFrame, QMainWindow, QPushButton, QWidget, QTableWidget, QTableWidgetItem, QMessageBox, QLineEdit, QVBoxLayout, QScrollArea
 from PyQt5.QtGui import QBrush, QColor, QCursor
-from PyQt5.QtCore import Qt
 from PyQt5 import QtCore
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
@@ -21,9 +20,8 @@ import key
 
 matplotlib.use('Qt5Agg')
 
-# Završit top x cryptos -> kako dodat tablicu?
-# zasto dupli klik prije pokazivanja pie charta, obicni chart moze i ovako?
 
+# zasto dupli klik prije pokazivanja pie charta, obicni chart moze i ovako?
 
 class PortfolioManager(QMainWindow):
     def __init__(self):
@@ -514,53 +512,6 @@ class AssetWindow(QWidget):
             'SELECT current_value FROM crypto').fetchall()])
         graph[0].show_overview(
             graph[1], graph[2], f'{graph[3]}: {round(cryptos, 2)} € total value', 'cryptos')
-
-
-class CryptoInfoWindow(QMainWindow):
-
-    def __init__(self):
-        super().__init__()
-        self.initUI()
-
-        self.setGeometry(0, 0, 1000, 1000)
-
-        self.setWindowTitle('Extra crypto information')
-
-    def initUI(self):
-        self.widget = QWidget()
-        self.grid = QGridLayout(self.widget)
-        self.setStyleSheet('background: #000000')
-
-        self.scroll = QScrollArea()
-        self.setCentralWidget(self.scroll)
-
-        self.scroll.setWidget(self.widget)
-
-        self.button = PushButton('Exit', 100, self.close)
-        self.grid.addWidget(self.button, 0, 1)
-
-        self.grid.addWidget(Label('Crypto distribution'), 1, 0)
-
-        self.make_graph()
-
-        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.scroll.setWidgetResizable(True)
-
-        # self.setGeometry(600, 100, 600, 500)
-        self.setWindowTitle('Scroll Area Demonstration')
-        self.show()
-
-        return
-
-    def make_graph(self):
-        graph = w.show_graph(table_name='crypto',
-                             amount='current_value', asset='ticker')
-        self.grid.addWidget(graph[0], 2, 0)
-        total_staking = sum([float(item[0]) for item in w.cursor.execute(
-            'SELECT current_value FROM crypto').fetchall()])
-        graph[0].show_overview(
-            graph[1], graph[2], f'{graph[3]}: {round(total_staking, 2)} € total value', 'staking')
 
 
 class StakingWindow(QWidget):
@@ -1085,10 +1036,13 @@ class ShowCryptos(QWidget):
 
         self.grid = QGridLayout(self)
 
-        self.grid.addWidget(Label('Num of cryptos: '), 0, 0)
+        self.frame_1 = QFrame(self)
+        self.grid_1 = QGridLayout(self.frame_1)
+
+        self.grid_1.addWidget(Label('Num of cryptos: '), 0, 0)
         self.edit_1 = LineEdit(300)
-        self.grid.addWidget(self.edit_1, 0, 1)
-        self.grid.addWidget(PushButton('Look up', 300, self.get_data), 0, 2)
+        self.grid_1.addWidget(self.edit_1, 0, 1)
+        self.grid_1.addWidget(PushButton('Look up', 300, self.get_data), 0, 2)
 
     def get_data(self):
         self.cursor = w.cursor
@@ -1128,7 +1082,7 @@ class ShowCryptos(QWidget):
                               'Data could not be fetched')
             msg.exec_()
 
-        info = {'id': [], 'name': [], 'symbol': [], 'price': [],
+        info = {'name': [], 'symbol': [], 'price': [], 'id': [],
                 'market_cap': [], 'market_dominance': []}
 
         for item in data:
@@ -1140,22 +1094,24 @@ class ShowCryptos(QWidget):
             info['market_dominance'].append(
                 item['quote']['EUR']['market_cap_dominance'])
 
-        self.df = pd.DataFrame(info)
-
         self.table = QTableWidget(int(limit), 6)
 
-        self.table = QTableWidget(int(limit), 6, self)
-        for i in range(int(limit)):
-            for j in range(6):
-                item = QTableWidgetItem(self.df.iloc[int(i), int(j)])
-                item.setForeground(QBrush(QColor("#1eecc9")))
-                self.table.setItem(i, j, item)
+        i = -1
 
-            # self.table.setHorizontalHeaderLabels(columns)
+        for item in info.keys():
+            i += 1
+            for j in range(len(info[item])):
+
+                insertion = str(info[item][j])
+                print(insertion)
+
+                table_item = QTableWidgetItem(insertion)
+                table_item.setForeground(QBrush(QColor("#1eecc9")))
+                self.table.setItem(j, i, table_item)
+
+        self.table.setHorizontalHeaderLabels(info.keys())
 
         self.grid.addWidget(self.table, 2, 3)
-
-        print(self.df.head(5))
 
 
 class LineEdit(QLineEdit):
