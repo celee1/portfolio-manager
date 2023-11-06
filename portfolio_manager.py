@@ -1039,6 +1039,12 @@ class ShowCryptos(QWidget):
         self.frame_1 = QFrame(self)
         self.grid_1 = QGridLayout(self.frame_1)
 
+        self.frame_2 = QFrame(self)
+        self.grid_2 = QGridLayout(self.frame_2)
+
+        self.grid.addWidget(self.frame_1, 0, 0)
+        self.grid.addWidget(self.frame_2, 1, 0)
+
         self.grid_1.addWidget(Label('Num of cryptos: '), 0, 0)
         self.edit_1 = LineEdit(300)
         self.grid_1.addWidget(self.edit_1, 0, 1)
@@ -1089,8 +1095,9 @@ class ShowCryptos(QWidget):
             info['id'].append(item['id'])
             info['name'].append(item['name'])
             info['symbol'].append(item['symbol'])
-            info['price'].append(item['quote']['EUR']['price'])
-            info['market_cap'].append(item['quote']['EUR']['market_cap'])
+            info['price'].append(round(item['quote']['EUR']['price'], 3))
+            info['market_cap'].append(
+                round(item['quote']['EUR']['market_cap'] / 1000000000, 3))
             info['market_dominance'].append(
                 item['quote']['EUR']['market_cap_dominance'])
 
@@ -1111,7 +1118,7 @@ class ShowCryptos(QWidget):
 
         self.table.setHorizontalHeaderLabels(info.keys())
 
-        self.grid.addWidget(self.table, 2, 3)
+        self.grid_2.addWidget(self.table, 0, 0)
 
 
 class LineEdit(QLineEdit):
