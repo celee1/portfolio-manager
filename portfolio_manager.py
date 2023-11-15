@@ -17,11 +17,11 @@ import json
 import sys
 import key
 
+# dodat stupac price per item? Lako podijelit cijenu s kolicinom i to je to
+
 
 matplotlib.use('Qt5Agg')
 
-
-# zasto dupli klik prije pokazivanja pie charta, obicni chart moze i ovako?
 
 class PortfolioManager(QMainWindow):
     def __init__(self):
@@ -492,9 +492,13 @@ class AssetWindow(QWidget):
 
     def make_graph(self):
 
+        self.db = sqlite3.connect(
+            r"C:\Users\celes\OneDrive\Documents\Python_3.10\Projects\App_projects\portfolio_updater\portfolio.db")
+        self.cursor = self.db.cursor()
+
         self.canvas = MplCanvas(self)
 
-        info = [item for item in w.cursor.execute(
+        info = [item for item in self.cursor.execute(
             f'SELECT value, date FROM total_value_crypto').fetchall()]
         value = [float(item[0]) for item in info]
         date = pd.to_datetime([item[1] for item in info])
@@ -729,6 +733,8 @@ class TransactionWindow(QWidget):
 
         self.edit_1.setFocus()
 
+        w.check_crypto()
+
 
 class DebtLossWindow(QWidget):
     def __init__(self, mode):
@@ -775,26 +781,31 @@ class SummaryWindow(QWidget):
 
         self.grid = QGridLayout(self)
 
+        self.frame_1 = QFrame(self)
+        self.grid_1 = QGridLayout(self.frame_1)
+
+        self.grid.addWidget(self.frame_1, 0, 0)
+
         self.label_1 = Label('crypto', 300)
-        self.grid.addWidget(self.label_1, 1, 0)
+        self.grid_1.addWidget(self.label_1, 1, 0)
         self.label_2 = Label('loss', 300)
-        self.grid.addWidget(self.label_2, 2, 0)
+        self.grid_1.addWidget(self.label_2, 2, 0)
         self.label_3 = Label('debt', 300)
-        self.grid.addWidget(self.label_3, 3, 0)
+        self.grid_1.addWidget(self.label_3, 3, 0)
 
         self.label_4 = Label('amount', 300)
-        self.grid.addWidget(self.label_4, 0, 1)
+        self.grid_1.addWidget(self.label_4, 0, 1)
         self.label_5 = Label('amount_invested', 300)
-        self.grid.addWidget(self.label_5, 0, 2)
+        self.grid_1.addWidget(self.label_5, 0, 2)
 
         amount, amount_invested = w.cursor.execute(
             f'SELECT SUM(current_value), SUM(amount_invested) FROM crypto').fetchall()[0]
 
         self.label_6 = Label(str(round(amount, 2)), 300)
-        self.grid.addWidget(self.label_6, 1, 1)
+        self.grid_1.addWidget(self.label_6, 1, 1)
 
         self.label_7 = Label(str(round(amount_invested, 2)), 300)
-        self.grid.addWidget(self.label_7, 1, 2)
+        self.grid_1.addWidget(self.label_7, 1, 2)
 
         loss, debt = w.cursor.execute(
             f'SELECT amount FROM loss_debt').fetchall()
@@ -803,32 +814,38 @@ class SummaryWindow(QWidget):
         debt = float(debt[0])
 
         self.label_8 = Label(str(round(loss, 2)), 300)
-        self.grid.addWidget(self.label_8, 2, 2)
+        self.grid_1.addWidget(self.label_8, 2, 2)
 
         self.label_9 = Label(str(round(debt, 2)), 300)
-        self.grid.addWidget(self.label_9, 3, 1)
+        self.grid_1.addWidget(self.label_9, 3, 1)
 
         self.label_10 = Label('total', 300)
-        self.grid.addWidget(self.label_10, 4, 0)
+        self.grid_1.addWidget(self.label_10, 4, 0)
 
         total_value = float(amount) - float(debt)
         self.label_11 = Label(str(round(total_value, 2)), 300)
-        self.grid.addWidget(self.label_11, 4, 1)
+        self.grid_1.addWidget(self.label_11, 4, 1)
 
         total_expenses = float(amount_invested) + loss
         self.label_11 = Label(str(round(total_expenses, 2)), 300)
-        self.grid.addWidget(self.label_11, 4, 2)
+        self.grid_1.addWidget(self.label_11, 4, 2)
+
+        self.frame_2 = QFrame(self)
+        self.frame_2.setStyleSheet('border: 2px solid #1eecc9')
+        self.grid_2 = QGridLayout(self.frame_2)
+
+        self.grid.addWidget(self.frame_2, 1, 0)
 
         self.label_12 = Label('net value', 300)
-        self.grid.addWidget(self.label_12, 5, 0)
+        self.grid_2.addWidget(self.label_12, 0, 0)
 
         abs_value = total_value - total_expenses
         self.label_13 = Label(str(round(abs_value, 2)), 300)
-        self.grid.addWidget(self.label_13, 5, 1)
+        self.grid_2.addWidget(self.label_13, 0, 1)
 
-        perc_value = (total_value / total_expenses) * 100 - 100
-        self.label_14 = Label(str(round(perc_value, 2)), 300)
-        self.grid.addWidget(self.label_14, 5, 2)
+        perc_value = total_value / total_expenses * 100
+        self.label_14 = Label(str(round(perc_value, 2)) + '%', 300)
+        self.grid_2.addWidget(self.label_14, 0, 2)
 
 
 class ShowTransactionsWindow(QWidget):
