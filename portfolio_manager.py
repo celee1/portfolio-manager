@@ -704,9 +704,6 @@ class TransactionWindow(QWidget):
         texts = [self.edit_1.text().lower(), self.edit_2.text().upper(),
                  self.edit_3.text(), self.edit_4.text()]
 
-        price_per_item = round(float(self.edit_4.text()) /
-                               float(self.edit_3.text()), 2)
-
         if '' in texts:
             msg = QMessageBox(
                 QMessageBox.Warning, 'Incomplete input', 'Please fill out all the entries')
@@ -722,6 +719,9 @@ class TransactionWindow(QWidget):
                               'Please use the correct number format with a decimal point')
             msg.exec_()
             return
+
+        price_per_item = round(float(self.edit_4.text()) /
+                               float(self.edit_3.text()), 2)
 
         w.cursor.execute(
             f'INSERT INTO transactions VALUES ("{texts[0]}", "{texts[1]}", "{texts[2]}", "{texts[3]}", "{price_per_item}");')
