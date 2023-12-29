@@ -370,8 +370,12 @@ class CoinChecker:
 
         for coin in coins:
             if coin[0] in coin_present:
-                cursor.execute(
-                    f'UPDATE crypto SET amount = "{round(coin[1], 4)}", amount_invested = "{round(coin[2], 4)}", dca_price = "{round(coin[2] / coin[1], 4)}" WHERE ticker = "{coin[0]}";')
+                if coin[2] > 0:
+                    cursor.execute(
+                        f'UPDATE crypto SET amount = "{round(coin[1], 4)}", amount_invested = "{round(coin[2], 4)}", dca_price = "{round(coin[2] / coin[1], 4)}" WHERE ticker = "{coin[0]}";')
+                else:
+                    cursor.execute(
+                        f'UPDATE crypto SET amount = "{round(coin[1], 4)}", amount_invested = "0", dca_price = "{round(coin[2] / coin[1], 4)}" WHERE ticker = "{coin[0]}";')
             else:
                 cursor.execute(
                     f'INSERT INTO crypto VALUES ("{coin[3]}", "{coin[0]}", "{round(coin[1], 4)}", "{round(coin[2], 4)}", "{round(coin[2], 4)}", "{round(coin[2] / coin[1], 4)}", "0", "0");')
