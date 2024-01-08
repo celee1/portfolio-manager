@@ -17,6 +17,8 @@ import json
 import sys
 import key
 
+# popravit dca price
+
 
 matplotlib.use('Qt5Agg')
 
@@ -369,13 +371,13 @@ class CoinChecker:
             'SELECT DISTINCT(ticker) FROM crypto;').fetchall()]
 
         for coin in coins:
-            if coin[0] in coin_present:
+            if coin[0] in coin_present:         
                 if coin[2] > 0:
                     cursor.execute(
-                        f'UPDATE crypto SET amount = "{round(coin[1], 4)}", amount_invested = "{round(coin[2], 4)}", dca_price = "{round(coin[2] / coin[1], 4)}" WHERE ticker = "{coin[0]}";')
+                    f'UPDATE crypto SET amount = "{round(coin[1], 4)}", amount_invested = "{round(coin[2], 4)}", dca_price = "{round(coin[2] / coin[1], 4)}" WHERE ticker = "{coin[0]}";')
                 else:
                     cursor.execute(
-                        f'UPDATE crypto SET amount = "{round(coin[1], 4)}", amount_invested = "0", dca_price = "{round(coin[2] / coin[1], 4)}" WHERE ticker = "{coin[0]}";')
+                        f'UPDATE crypto SET amount = "{round(coin[1], 4)}", amount_invested = "0", dca_price = "0" WHERE ticker = "{coin[0]}";')
             else:
                 cursor.execute(
                     f'INSERT INTO crypto VALUES ("{coin[3]}", "{coin[0]}", "{round(coin[1], 4)}", "{round(coin[2], 4)}", "{round(coin[2], 4)}", "{round(coin[2] / coin[1], 4)}", "0", "0");')
@@ -405,7 +407,7 @@ class CoinChecker:
             'SELECT dca_price, current_price, ticker FROM crypto').fetchall()
 
         for item in price:
-            try:
+            if item[0] != '0':
                 ratio = float(item[1]) / float(item[0]) * 100
                 if ratio > 1:
                     ratio = (ratio - 100)
@@ -413,11 +415,11 @@ class CoinChecker:
                     ratio = -(100 - ratio)
                 else:
                     ratio = 100
-                self.cursor.execute(
-                    f'UPDATE crypto SET profit_loss = "{round(ratio, 2)}" WHERE ticker = "{item[2]}";')
-
-            except ZeroDivisionError:
-                pass
+            else:
+                ratio = 0
+                
+            self.cursor.execute(
+                f'UPDATE crypto SET profit_loss = "{round(ratio, 2)}" WHERE ticker = "{item[2]}";')
 
         self.database.commit()
 
