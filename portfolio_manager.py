@@ -17,7 +17,7 @@ import json
 import sys
 import key
 
-# popravit dca price
+# dodat funkcionalnost za dca price
 
 
 matplotlib.use('Qt5Agg')
@@ -366,6 +366,7 @@ class CoinChecker:
 
         coins = cursor.execute(
             'SELECT DISTINCT(ticker), SUM(amount), SUM(amount_invested), coin FROM transactions GROUP BY ticker;').fetchall()
+        
 
         coin_present = [item[0] for item in cursor.execute(
             'SELECT DISTINCT(ticker) FROM crypto;').fetchall()]
@@ -580,7 +581,7 @@ class StakingUpdate(QWidget):
         self.setGeometry(0, 0, 1000, 900)
         self.setWindowTitle('Update staking information')
         self.setStyleSheet('background: #000000')
-
+ 
         self.grid_basic = QGridLayout(self)
 
         self.frame_1 = QFrame(self)
@@ -621,12 +622,6 @@ class StakingUpdate(QWidget):
         self.edit_4 = LineEdit(400)
         self.grid.addWidget(self.edit_4, 3, 1)
 
-        self.label_5 = Label('yield', 400)
-        self.grid.addWidget(self.label_5, 4, 0)
-
-        self.edit_5 = LineEdit(400)
-        self.grid.addWidget(self.edit_5, 4, 1)
-
         self.frame_3 = QFrame(self)
         self.grid_basic.addWidget(self.frame_3, 2, 0)
         self.grid_2 = QGridLayout(self.frame_3)
@@ -639,11 +634,14 @@ class StakingUpdate(QWidget):
             'insert staking', 300, self.insert_new_stake)
         self.grid_2.addWidget(self.button_2, 0, 1)
 
+        self.button_3 = PushButton('delete staking', 300, self.delete_existing_stake)
+        self.grid_2.addWidget(self.button_3, 0, 2)
+
         self.edit_1.setFocus()
 
     def insert_new_stake(self):
         w.cursor.execute(
-            f'INSERT INTO staking VALUES ("{self.edit_1.text()}", "{self.edit_2.text()}", "{self.edit_3.text()}", "{self.edit_4.text()}", "{self.edit_5.text()}");')
+            f'INSERT INTO staking VALUES ("{self.edit_1.text()}", "{self.edit_2.text()}", "{self.edit_3.text()}", "{self.edit_4.text()}");')
         w.db.commit()
 
         [item.setText('')
@@ -652,7 +650,7 @@ class StakingUpdate(QWidget):
 
     def update_existing_stake(self):
         staking_info = [self.edit_1.text(), self.edit_2.text(
-        ), self.edit_3.text(), self.edit_4.text(), self.edit_5.text()]
+        ), self.edit_3.text(), self.edit_4.text()]
         existing_info = w.cursor.execute(
             f'SELECT * FROM staking WHERE ticker = "{self.edit_1.text()}";').fetchall()
         if staking_info[0] == '':
@@ -665,11 +663,14 @@ class StakingUpdate(QWidget):
                 staking_info[i] = existing_info[0][i]
 
         w.cursor.execute(
-            f'UPDATE staking SET amount = "{staking_info[1]}", apy = "{staking_info[2]}", service_provider = "{staking_info[3]}", yield = "{staking_info[4]}" WHERE ticker = "{staking_info[0]}"')
+            f'UPDATE staking SET amount = "{staking_info[1]}", apy = "{staking_info[2]}", service_provider = "{staking_info[3]}" WHERE ticker = "{staking_info[0]}"')
         w.db.commit()
         [item.setText('')
          for item in self.children() if type(item) == LineEdit]
         CoinChecker(w.cursor, w.db).update_staking()
+
+    def delete_existing_stake(self):
+        w.cursor.execute(f'DELETE FROM STAKING WHERE ticker = "{self.edit_1.text()}"')
 
 
 class TransactionWindow(QWidget):
